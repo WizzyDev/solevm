@@ -24,7 +24,7 @@ use crate::rpc::{CallDbClient, CloneRpcClient, SolanaRpc};
 use serde_with::{serde_as, DisplayFromStr};
 use solana_client::nonblocking::rpc_client::RpcClient;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Status {
     Ok,
     Emergency,
@@ -41,7 +41,7 @@ pub struct ChainInfo {
 }
 
 #[serde_as]
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GetConfigResponse {
     pub version: String,
     pub revision: String,

@@ -69,8 +69,12 @@ async fn read_program_data_from_account(
         programdata_address,
     }) = account.state()
     {
-        let Some(programdata_account) = rpc_client.get_account(&programdata_address).await?.value else {
-            return Err(NeonError::AssociatedPdaNotFound(programdata_address, program_id));
+        let Some(programdata_account) = rpc_client.get_account(&programdata_address).await?.value
+        else {
+            return Err(NeonError::AssociatedPdaNotFound(
+                programdata_address,
+                program_id,
+            ));
         };
 
         let offset = UpgradeableLoaderState::size_of_programdata_metadata();

@@ -25,7 +25,7 @@ pub async fn execute(
     storage_account: &Pubkey,
 ) -> NeonResult<CancelTrxReturn> {
     let Some(mut acc) = rpc_client.get_account(storage_account).await?.value else {
-        return Err(NeonError::AccountNotFound(*storage_account))
+        return Err(NeonError::AccountNotFound(*storage_account));
     };
     let storage_info = account_info(storage_account, &mut acc);
     let storage = StateAccount::from_account(&evm_loader, storage_info)?;

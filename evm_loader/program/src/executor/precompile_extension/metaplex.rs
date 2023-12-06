@@ -1,12 +1,10 @@
 #![allow(clippy::unnecessary_wraps)]
+
+use std::any::Any;
 use std::convert::{Into, TryInto};
 
 use ethnum::U256;
 use maybe_async::maybe_async;
-use mpl_token_metadata::state::{
-    Creator, Metadata, TokenMetadataAccount, TokenStandard, CREATE_FEE, MAX_MASTER_EDITION_LEN,
-    MAX_METADATA_LEN,
-};
 use solana_program::{pubkey::Pubkey, rent::Rent, sysvar::Sysvar};
 
 use crate::{
@@ -160,7 +158,13 @@ fn create_metadata<B: AccountStorage>(
         vec![bump_seed],
     ];
 
-    let (metadata_pubkey, _) = mpl_token_metadata::pda::find_metadata_account(&mint);
+    let (metadata_pubkey, _) = mpl_token_metadata::accounts::metadata::Metadata::find_pda(&mint);
+
+    let mut builder = mpl_token_metadata::instructions::create_metadata_account_v3::CreateMetadataAccountV3Builder::new();
+    builder
+        .metadata(metadata_pubkey)
+        .mint(mint)
+        .mint_authority(signer_pubkey);
 
     let instruction = mpl_token_metadata::instruction::create_metadata_accounts_v3(
         mpl_token_metadata::ID,

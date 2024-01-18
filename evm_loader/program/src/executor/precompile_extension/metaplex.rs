@@ -160,9 +160,9 @@ fn create_metadata<B: AccountStorage>(
         vec![bump_seed],
     ];
 
-    let (metadata_pubkey, _) = mpl_token_metadata::accounts::metadata::Metadata::find_pda(&mint);
+    let (metadata_pubkey, _) = mpl_token_metadata::accounts::Metadata::find_pda(&mint);
 
-    let instruction = mpl_token_metadata::instructions::create_metadata_account_v3::CreateMetadataAccountV3Builder::new()
+    let instruction = mpl_token_metadata::instructions::CreateMetadataAccountV3Builder::new()
         .metadata(metadata_pubkey)
         .mint(mint)
         .mint_authority(signer_pubkey)
@@ -187,7 +187,9 @@ fn create_metadata<B: AccountStorage>(
             ]),
             collection: None,
             uses: None,
-        }).is_mutable(false).build();
+        })
+        .is_mutable(false)
+        .build();
 
     let rent = Rent::get()?;
     let fee = rent.minimum_balance(MAX_METADATA_LEN) + CREATE_FEE;

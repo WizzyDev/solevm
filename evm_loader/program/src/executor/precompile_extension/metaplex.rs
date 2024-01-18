@@ -5,6 +5,8 @@ use std::convert::{Into, TryInto};
 
 use ethnum::U256;
 use maybe_async::maybe_async;
+use mpl_token_metadata::types::{Creator, DataV2};
+use ripemd::digest::typenum::cmp;
 use solana_program::{pubkey::Pubkey, rent::Rent, sysvar::Sysvar};
 
 use crate::{
@@ -160,41 +162,32 @@ fn create_metadata<B: AccountStorage>(
 
     let (metadata_pubkey, _) = mpl_token_metadata::accounts::metadata::Metadata::find_pda(&mint);
 
-    let mut builder = mpl_token_metadata::instructions::create_metadata_account_v3::CreateMetadataAccountV3Builder::new();
-    builder
+    let instruction = mpl_token_metadata::instructions::create_metadata_account_v3::CreateMetadataAccountV3Builder::new()
         .metadata(metadata_pubkey)
         .mint(mint)
-        .mint_authority(signer_pubkey);
-
-    let instruction = mpl_token_metadata::instruction::create_metadata_accounts_v3(
-        mpl_token_metadata::ID,
-        metadata_pubkey,
-        mint,
-        signer_pubkey,
-        state.backend.operator(),
-        signer_pubkey,
-        name,
-        symbol,
-        uri,
-        Some(vec![
-            Creator {
-                address: *state.backend.program_id(),
-                verified: false,
-                share: 0,
-            },
-            Creator {
-                address: signer_pubkey,
-                verified: true,
-                share: 100,
-            },
-        ]),
-        0,     // Seller Fee
-        true,  // Update Authority == Mint Authority
-        false, // Is Mutable
-        None,  // Collection
-        None,  // Uses
-        None,  // Collection Details
-    );
+        .mint_authority(signer_pubkey)
+        .payer(state.backend.operator())
+        .update_authority(signer_pubkey)
+        .data(DataV2 {
+            name,
+            symbol,
+            uri,
+            seller_fee_basis_points: 0,
+            creators: Some(vec![
+                Creator {
+                    address: *state.backend.program_id(),
+                    verified: false,
+                    share: 0,
+                },
+                Creator {
+                    address: signer_pubkey,
+                    verified: true,
+                    share: 100,
+                },
+            ]),
+            collection: None,
+            uses: None,
+        }).is_mutable(false).build();
 
     let rent = Rent::get()?;
     let fee = rent.minimum_balance(MAX_METADATA_LEN) + CREATE_FEE;
@@ -219,19 +212,23 @@ fn create_master_edition<B: AccountStorage>(
         vec![bump_seed],
     ];
 
-    let (metadata_pubkey, _) = mpl_token_metadata::pda::find_metadata_account(&mint);
-    let (edition_pubkey, _) = mpl_token_metadata::pda::find_master_edition_account(&mint);
+    let (metadata_pubkey, _) = mpl_token_metadata::accounts::metadata::Metadata::find_pda(&mint);
+    let (edition_pubkey, _) =
+        mpl_token_metadata::accounts::master_edition::MasterEdition::find_pda(&mint);
 
-    let instruction = mpl_token_metadata::instruction::create_master_edition_v3(
-        mpl_token_metadata::ID,
-        edition_pubkey,
-        mint,
-        signer_pubkey,
-        signer_pubkey,
-        metadata_pubkey,
-        state.backend.operator(),
-        max_supply,
-    );
+    let mut builder = mpl_token_metadata::instructions::create_master_edition_v3::CreateMasterEditionV3Builder::new()
+        .edition(edition_pubkey)
+        .mint(mint)
+        .update_authority(signer_pubkey)
+        .mint_authority(signer_pubkey)
+        .metadata(metadata_pubkey)
+        .payer(state.backend.operator());
+
+    if let Some(max_supply) = max_supply {
+        builder = builder.max_supply(max_supply);
+    }
+
+    let instruction = builder.build();
 
     let rent = Rent::get()?;
     let fee = rent.minimum_balance(MAX_MASTER_EDITION_LEN) + CREATE_FEE;
@@ -313,7 +310,7 @@ async fn metadata<B: AccountStorage>(
     state: &mut ExecutorState<'_, B>,
     mint: Pubkey,
 ) -> Result<Option<Metadata>> {
-    let (metadata_pubkey, _) = mpl_token_metadata::pda::find_metadata_account(&mint);
+    let (metadata_pubkey, _) = mpl_token_metadata::accounts::metadata::Metadata::find_pda(&mint);
     let metadata_account = state.external_account(metadata_pubkey).await?;
 
     let result = {
